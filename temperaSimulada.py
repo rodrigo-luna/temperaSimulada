@@ -2,6 +2,13 @@ import random
 import math
 import copy
 
+NUM_TENTATIVAS = 10
+TEMPERATURA_INICIAL = 1000
+ALPHA = 0.99
+MAX_MESMA_SOLUCAO = 300
+MAX_MESMO_CUSTO = 300
+NOME_ARQUIVO = 'cidades_20.txt'
+
 def ler_cidades(nome_arquivo):
     cidades = []
     with open(nome_arquivo, 'r') as f:
@@ -15,46 +22,51 @@ def ler_cidades(nome_arquivo):
     return cidades
 
 def tempera_simulada(estado_inicial):
-    temperatura_atual = TEMPERATURA_INICIAL
+    temperatura = TEMPERATURA_INICIAL
+    solucao = estado_inicial    
+    iteracoes = 0
+    melhor_i = 0
+    mesma_solucao = 0
+    mesmo_custo = 0
 
-    # Start by initializing the current state with the initial state
-    solution = estado_inicial
-    same_solution = 0
-    same_cost_diff = 0
-    
-    while same_solution < 1500 and same_cost_diff < 150000:
-        sucessor = get_sucessor(solution)
+    while mesma_solucao < MAX_MESMA_SOLUCAO and mesmo_custo < MAX_MESMO_CUSTO:
+        iteracoes += 1
+        sucessor = get_sucessor(solucao)
         
         # Checa se o sucessor é melhor
-        cost_diff = get_cost(sucessor) - get_cost(solution)
-        # se a solução nova for melhor, fica com ela
-        if cost_diff > 0:
-            solution = sucessor
-            same_solution = 0
-            same_cost_diff = 0
-            
-        elif cost_diff == 0:
-            solution = sucessor
-            same_solution = 0
-            same_cost_diff +=1
-        # se a nova solução for pior, aceitar apenas com probabilidade e^(-custo/temperatura)
-        else:
-            if random.uniform(0, 1) <= math.exp(float(cost_diff) / float(temperatura_atual)):
-                solution = sucessor
-                same_solution = 0
-                same_cost_diff = 0
-            else:
-                same_solution += 1
-                same_cost_diff += 1
-        # reduz a temperatura
-        temperatura_atual = temperatura_atual*ALPHA
-        print(1/get_cost(solution), same_solution)
-    print(1/get_cost(solution))
-    
-    return solution, 1/get_cost(solution)
+        diferenca = get_custo(sucessor) - get_custo(solucao)
 
-def get_cost(estado):
-    """Retorna custo total de um trajeto"""
+        # se a solução nova for melhor, troca pra ela
+        if diferenca > 0:
+            solucao = sucessor
+            mesma_solucao = 0
+            mesmo_custo = 0
+            melhor_i = iteracoes
+        # mesma distância
+        elif diferenca == 0:
+            solucao = sucessor
+            mesma_solucao = 0
+            mesmo_custo +=1
+            
+        # se a nova solução for pior, aceitar apenas com probabilidade e^(-delta_custo/temperatura)
+        else:
+            if random.uniform(0, 1) <= math.exp(float(diferenca) / float(temperatura)):
+                solucao = sucessor
+                mesma_solucao = 0
+                mesmo_custo = 0
+        # continua com a mesma solução
+            else:
+                mesma_solucao += 1
+                mesmo_custo += 1
+
+        # reduz a temperatura
+        temperatura = temperatura*ALPHA
+        print(1/get_custo(solucao), mesma_solucao, melhor_i)
+    
+    return solucao, 1/get_custo(solucao), melhor_i
+
+def get_custo(estado):
+    # Retorna custo total de um estado
     distancia = 0
     for i in range(len(estado)):
         if i+1 < len(estado):
@@ -65,11 +77,9 @@ def get_cost(estado):
     return fitness
     
 def get_sucessor(estado):
-    """Retorna um novo estado."""
-    
     sucessor = copy.deepcopy(estado)
-    
-    "Retira uma cidade aleatória da sua posição e coloca em outra posição aleatória"
+
+    # Retira uma cidade aleatória da sua posição e coloca em outra posição aleatória
     node_j = random.choice(sucessor)
     sucessor.remove(node_j)
     node_i = random.choice(sucessor)
@@ -78,14 +88,17 @@ def get_sucessor(estado):
         
     return sucessor
 
-melhor_distancia = []
-melhor_rota = []
-cidades = ler_cidades('cidades_20.txt')
-NUM_TENTATIVAS = 10
-TEMPERATURA_INICIAL = 5000
-ALPHA = 0.99
+distancias_totais = []
+rotas = []
+cidades = ler_cidades(NOME_ARQUIVO)
 
-for i in range(NUM_TENTATIVAS):     
-    rota, distancia = tempera_simulada(cidades)
-    melhor_distancia.append(distancia)
-    melhor_rota.append(rota)
+for _ in range(NUM_TENTATIVAS):     
+    # retorna a rota final, a distância total do trajeto, e o número de iterações necessárias pra chegar na solução
+    rota, distancia, i = tempera_simulada(cidades)
+    
+    rotas.append(rota)
+    distancias_totais.append([distancia, i])
+
+    print (distancias_totais)
+    with open("resultados.txt", 'a') as f:
+        f.write("\n" + str([int(distancia), i]))
